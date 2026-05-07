@@ -11,6 +11,7 @@ import type {
   RoomState,
   RoundState,
   RoundSummary,
+  RoundHistoryEntry,
   TrickPlay,
   TrickResult,
 } from "./types.js";
@@ -304,6 +305,7 @@ export function playCard(room: RoomState, playerId: string, cardId: string, rand
   if (!trickComplete) {
     const nextGame: GameState = {
       ...game,
+      lastResolvedTrick: null,
       currentRound: {
         ...game.currentRound,
         hands: nextHands,
@@ -328,6 +330,7 @@ export function playCard(room: RoomState, playerId: string, cardId: string, rand
     const winnerIndex = game.playerOrder.indexOf(trickResult.winnerId);
     const nextGame: GameState = {
       ...game,
+      lastResolvedTrick: trickResult,
       currentRound: {
         ...game.currentRound,
         hands: nextHands,
@@ -477,7 +480,9 @@ function createGameState(
     maxRounds: calculateMaxRounds(options.playerCount),
     scores,
     currentRound: round,
+    lastResolvedTrick: null,
     previousRoundSummary: null,
+    roundHistory: [],
     winnerIds: null,
     devTimeline: [],
   };
@@ -538,6 +543,15 @@ function advanceAfterRound(
   const nextScores = Object.fromEntries(
     game.playerOrder.map((playerId) => [playerId, game.scores[playerId] + summary.scoreDeltas[playerId]]),
   );
+  const historyEntry: RoundHistoryEntry = {
+    roundNumber: game.roundNumber,
+    handSize: summary.handSize,
+    bids: summary.bids,
+    taken: summary.taken,
+    scoreDeltas: summary.scoreDeltas,
+    scoresAfter: nextScores,
+  };
+  const roundHistory = [...game.roundHistory, historyEntry];
 
   if (game.roundNumber >= game.maxRounds) {
     const highestScore = Math.max(...Object.values(nextScores));
@@ -546,7 +560,9 @@ function advanceAfterRound(
       ...game,
       phase: "game-over",
       scores: nextScores,
+      lastResolvedTrick: completedTricks.at(-1) ?? null,
       previousRoundSummary: summary,
+      roundHistory,
       winnerIds,
       currentRound: {
         ...game.currentRound,
@@ -568,7 +584,9 @@ function advanceAfterRound(
     dealerIndex: nextDealerIndex,
     roundNumber: nextRoundNumber,
     scores: nextScores,
+    lastResolvedTrick: completedTricks.at(-1) ?? null,
     previousRoundSummary: summary,
+    roundHistory,
     winnerIds: null,
     currentRound: nextRound,
   };
@@ -657,11 +675,13 @@ function toPublicGameState(
     handSize: game.currentRound.handSize,
     currentTrick: game.currentRound.currentTrick,
     completedTrickCount: game.currentRound.completedTricks.length,
+    lastResolvedTrick: game.lastResolvedTrick,
     players: publicPlayers,
     yourHand: game.currentRound.hands[selfPlayerId] ?? [],
     allowedBids: getAllowedBids(game, selfPlayerId),
     playableCardIds: getPlayableCardIds(game, selfPlayerId),
     previousRoundSummary: game.previousRoundSummary,
+    roundHistory: game.roundHistory,
     winnerIds: game.winnerIds,
     devTimeline: game.devTimeline,
   };

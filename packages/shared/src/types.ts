@@ -72,6 +72,11 @@ export type RoundSummary = {
   scoreDeltas: Record<string, number>;
 };
 
+export type RoundHistoryEntry = RoundSummary & {
+  roundNumber: number;
+  scoresAfter: Record<string, number>;
+};
+
 export type DevTimelineEntry = {
   id: string;
   handNumber: number;
@@ -87,7 +92,9 @@ export type GameState = {
   maxRounds: number;
   scores: Record<string, number>;
   currentRound: RoundState;
+  lastResolvedTrick: TrickResult | null;
   previousRoundSummary: RoundSummary | null;
+  roundHistory: RoundHistoryEntry[];
   winnerIds: string[] | null;
   devTimeline: DevTimelineEntry[];
 };
@@ -122,11 +129,13 @@ export type PublicGameState = {
   handSize: number;
   currentTrick: TrickPlay[];
   completedTrickCount: number;
+  lastResolvedTrick: TrickResult | null;
   players: PublicPlayerState[];
   yourHand: Card[];
   allowedBids: number[];
   playableCardIds: string[];
   previousRoundSummary: RoundSummary | null;
+  roundHistory: RoundHistoryEntry[];
   winnerIds: string[] | null;
   devTimeline: DevTimelineEntry[];
 };
