@@ -1,0 +1,17 @@
+{
+  "name": "wizard-online",
+  "private": true,
+  "packageManager": "pnpm@10.27.0",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @wizard/shared --filter @wizard/server --filter @wizard/web dev",
+    "build": "pnpm -r build",
+    "test": "pnpm --filter @wizard/shared test && pnpm --filter @wizard/server test",
+    "typecheck": "pnpm -r typecheck",
+    "verify": "pnpm test && pnpm typecheck && pnpm build",
+    "db:up": "docker compose up -d mysql",
+    "db:down": "docker compose down"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}
