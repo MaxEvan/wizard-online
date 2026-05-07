@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --parchment: #f7f0de;
+  --ink: #0b1a21;
+  --brass: #c9a563;
+  color: #f7f0de;
+  background:
+    radial-gradient(circle at top, rgba(201, 165, 99, 0.24), transparent 28%),
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.05), transparent 18%),
+    linear-gradient(160deg, #08161c 0%, #123126 40%, #0d4d3e 100%);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: transparent;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button,
+input,
+select,
+[role="button"] {
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease,
+    box-shadow 140ms ease;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid rgba(201, 165, 99, 0.9);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
