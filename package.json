@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "pnpm --parallel --filter @wizard/shared --filter @wizard/server --filter @wizard/web dev",
     "build": "pnpm -r build",
+    "start": "pnpm --filter @wizard/server start",
     "test": "pnpm --filter @wizard/shared test && pnpm --filter @wizard/server test",
     "typecheck": "pnpm -r typecheck",
     "verify": "pnpm test && pnpm typecheck && pnpm build",

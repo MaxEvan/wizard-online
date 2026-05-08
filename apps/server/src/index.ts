@@ -1,8 +1,10 @@
+import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { config as loadEnv } from "dotenv";
 
+import fastifyStatic from "@fastify/static";
 import Fastify from "fastify";
 import { Server } from "socket.io";
 
@@ -18,6 +20,7 @@ const port = Number(process.env.PORT ?? 3001);
 const devSimulationEnabled = process.env.NODE_ENV !== "production";
 const devActionDelayMs = 500;
 const databaseUrl = process.env.DATABASE_URL;
+const webDistDir = resolve(currentDir, "../../web/dist");
 
 if (!databaseUrl) {
   throw new Error("DATABASE_URL is required.");
@@ -30,6 +33,16 @@ const app = Fastify({ logger: true });
 const roomActionQueues = new Map<string, Promise<void>>();
 
 app.get("/api/health", async () => ({ ok: true }));
+
+if (existsSync(webDistDir)) {
+  await app.register(fastifyStatic, {
+    root: webDistDir,
+    prefix: "/assets/",
+  });
+
+  app.get("/", async (_request, reply) => reply.sendFile("index.html"));
+  app.get("/room/:code", async (_request, reply) => reply.sendFile("index.html"));
+}
 
 app.post<{
   Body: { name: string; options?: Partial<RoomOptions>; simulateBots?: boolean };

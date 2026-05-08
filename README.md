@@ -59,7 +59,7 @@ The web app talks to the backend through same-origin paths:
 - HTTP API: `/api/...`
 - Socket.IO: `/api/socket.io`
 
-In local development, Vite proxies `/api` to the server on port `3001`. In production, put a reverse proxy in front of web and API and forward `/api/*` to the backend service.
+In local development, Vite proxies `/api` to the server on port `3001`. In production, the Fastify server can serve the built web app directly from `apps/web/dist`, so the browser still talks to the same origin for both the SPA and API.
 
 5. Open:
 
@@ -79,6 +79,40 @@ That runs:
 - shared rule tests
 - workspace typecheck
 - workspace builds
+
+## Railway Deployment
+
+This repo is set up to deploy as:
+
+- one Railway app service for the Node server and built Vite frontend
+- one Railway MySQL service for persistence
+
+The repo includes [railway.json](/Users/me9/dev/wizard-online/railway.json), which tells Railway to:
+
+- build with `pnpm build`
+- start with `pnpm start`
+- healthcheck `GET /api/health`
+
+### Railway setup
+
+1. Create a new Railway project and connect this repo.
+2. Add a MySQL service to the project.
+3. In the app service, set:
+
+```bash
+DATABASE_URL=${{MySQL.MYSQL_URL}}
+NODE_ENV=production
+```
+
+4. Deploy the app service.
+
+Railway injects `PORT` automatically, and the server already binds `0.0.0.0` and uses `process.env.PORT`.
+
+After deploy:
+
+- `/` serves the web app
+- `/room/<CODE>` serves the SPA route
+- `/api/*` serves the backend and Socket.IO endpoints
 
 ## Notes
 
