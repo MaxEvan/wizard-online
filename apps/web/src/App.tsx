@@ -791,9 +791,7 @@ function GameBoard({
                         className={`rounded-[24px] border px-4 py-4 text-sm shadow-[0_18px_42px_rgba(0,0,0,0.28)] backdrop-blur ${
                           isTurn
                             ? "active-seat-pulse border-brass/70 bg-[linear-gradient(180deg,rgba(201,165,99,0.24),rgba(21,19,10,0.46))] shadow-[0_0_0_1px_rgba(201,165,99,0.22),0_18px_42px_rgba(0,0,0,0.28)]"
-                            : isDealer
-                              ? "border-[#e3c98d]/35 bg-[linear-gradient(180deg,rgba(201,165,99,0.14),rgba(0,0,0,0.34))]"
-                              : "border-white/10 bg-[linear-gradient(180deg,rgba(0,0,0,0.38),rgba(0,0,0,0.28))]"
+                            : "border-white/10 bg-[linear-gradient(180deg,rgba(0,0,0,0.38),rgba(0,0,0,0.28))]"
                         } ${isSelfPlayer ? "min-h-[148px]" : ""}`}
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -1005,7 +1003,7 @@ function GameBoard({
           onClose={() => setRoundSummaryDialog(null)}
         />
       ) : null}
-      {turnToastMessage ? <ActionToast message={turnToastMessage} /> : null}
+      {turnToastMessage ? <ActionToast message={turnToastMessage} onClick={() => setActiveDialog(primarySeatAction.dialog)} /> : null}
     </Panel>
   );
 }
@@ -1228,12 +1226,19 @@ function ActionDialog({
   );
 }
 
-function ActionToast({ message }: { message: string }) {
+function ActionToast({ message, onClick }: { message: string; onClick?: () => void }) {
+  const toastClassName =
+    "turn-toast rounded-full border border-brass/35 bg-[linear-gradient(180deg,rgba(18,26,32,0.92),rgba(8,15,20,0.96))] px-7 py-4 text-center text-[1.3125rem] font-semibold text-parchment shadow-[0_18px_42px_rgba(0,0,0,0.32)] backdrop-blur";
+
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex translate-y-[15%] justify-center px-4">
-      <div className="turn-toast rounded-full border border-brass/35 bg-[linear-gradient(180deg,rgba(18,26,32,0.92),rgba(8,15,20,0.96))] px-7 py-4 text-center text-[1.3125rem] font-semibold text-parchment shadow-[0_18px_42px_rgba(0,0,0,0.32)] backdrop-blur">
-        {message}
-      </div>
+    <div className={`fixed inset-x-0 bottom-6 z-40 flex translate-y-[15%] justify-center px-4 ${onClick ? "" : "pointer-events-none"}`}>
+      {onClick ? (
+        <button type="button" className={toastClassName} onClick={onClick}>
+          {message}
+        </button>
+      ) : (
+        <div className={toastClassName}>{message}</div>
+      )}
     </div>
   );
 }
