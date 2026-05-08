@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { addPlayerToRoom, createRoomState, resolveTrick, startGame } from "../src/game.js";
+import {
+  addPlayerToRoom,
+  chooseTrump,
+  createRoomState,
+  getAllowedBids,
+  getPlayableCardIds,
+  playCard,
+  resolveTrick,
+  startGame,
+  startNextRound,
+  submitBid,
+} from "../src/game.js";
 import type { TrickPlay } from "../src/types.js";
 
 describe("resolveTrick", () => {
@@ -53,5 +64,42 @@ describe("startGame", () => {
     expect(started.players.map((player) => player.seat)).toEqual([0, 1, 2, 3]);
     expect(started.game?.playerOrder).toEqual(["p3", "host", "p2", "p4"]);
     expect(started.game?.dealerIndex).toBe(2);
+  });
+
+  it("waits for the host to start the next round after the hand ends", () => {
+    const room = addPlayerToRoom(
+      addPlayerToRoom(createRoomState("ABC123", "host", "Host", { playerCount: 3 }), "p2", "P2"),
+      "p3",
+      "P3",
+    );
+
+    let currentRoom = startGame(room, () => 0);
+    expect(currentRoom.game?.roundNumber).toBe(1);
+
+    if (currentRoom.game?.phase === "choose-trump") {
+      currentRoom = chooseTrump(currentRoom, currentRoom.game.playerOrder[currentRoom.game.currentRound.dealerIndex]!, "spades");
+    }
+
+    while (currentRoom.game?.phase === "bidding") {
+      const bidderId = currentRoom.game.playerOrder[currentRoom.game.currentRound.activePlayerIndex]!;
+      const bid = getAllowedBids(currentRoom.game, bidderId)[0]!;
+      currentRoom = submitBid(currentRoom, bidderId, bid);
+    }
+
+    while (currentRoom.game?.phase === "playing") {
+      const playerId = currentRoom.game.playerOrder[currentRoom.game.currentRound.activePlayerIndex]!;
+      const cardId = getPlayableCardIds(currentRoom.game, playerId)[0]!;
+      currentRoom = playCard(currentRoom, playerId, cardId, () => 0);
+    }
+
+    expect(currentRoom.game?.phase).toBe("round-summary");
+    expect(currentRoom.game?.roundNumber).toBe(1);
+    expect(currentRoom.game?.previousRoundSummary).not.toBeNull();
+
+    currentRoom = startNextRound(currentRoom, "host", () => 0);
+
+    expect(currentRoom.game?.phase).toBe("bidding");
+    expect(currentRoom.game?.roundNumber).toBe(2);
+    expect(currentRoom.game?.previousRoundSummary).toBeNull();
   });
 });

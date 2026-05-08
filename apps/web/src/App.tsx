@@ -558,9 +558,11 @@ export default function App() {
                     game={game}
                     selfPlayerId={playerId}
                     roomCode={room.code}
+                    isHost={isHost}
                     onChooseTrump={(suit) => emit("game:choose-trump", { suit })}
                     onBid={(bid) => emit("game:bid", { bid })}
                     onPlayCard={(cardId) => emit("game:play-card", { cardId })}
+                    onNextRound={() => emit("game:next-round", {})}
                   />
                 ) : null}
 
@@ -605,20 +607,25 @@ function GameBoard({
   game: incomingGame,
   selfPlayerId,
   roomCode,
+  isHost,
   onChooseTrump,
   onBid,
   onPlayCard,
+  onNextRound,
 }: {
   game: PublicGameState;
   selfPlayerId: string | null;
   roomCode: string;
+  isHost: boolean;
   onChooseTrump: (suit: CardSuit) => void;
   onBid: (bid: number) => void;
   onPlayCard: (cardId: string) => void;
+  onNextRound: () => void;
 }) {
   const [game, setGame] = useState(incomingGame);
   const self = game.players.find((player) => player.id === selfPlayerId) ?? null;
   const dealer = game.players.find((player) => player.seat === game.dealerIndex) ?? null;
+  const isWaitingForNextRound = incomingGame.phase === "round-summary";
   const isTrumpChooser = game.phase === "choose-trump" && dealer?.id === selfPlayerId;
   const isActive = game.activePlayerId === selfPlayerId;
   const turnToastMessage = getTurnToastMessage(game, selfPlayerId, dealer?.id ?? null, self?.isBot ?? false);
@@ -648,6 +655,12 @@ function GameBoard({
   useEffect(() => {
     setActiveDialog(null);
   }, [game.roundNumber, game.phase, selfPlayerId]);
+
+  useEffect(() => {
+    if (!game.previousRoundSummary) {
+      setRoundSummaryDialog(null);
+    }
+  }, [game.previousRoundSummary]);
 
   useEffect(() => {
     displayedGameRef.current = game;
@@ -1000,6 +1013,8 @@ function GameBoard({
         <RoundSummaryDialog
           summary={roundSummaryDialog}
           players={game.players}
+          canAdvance={isHost && isWaitingForNextRound}
+          onAdvance={onNextRound}
           onClose={() => setRoundSummaryDialog(null)}
         />
       ) : null}
@@ -1464,16 +1479,31 @@ function TableMenuDialog({
 function RoundSummaryDialog({
   summary,
   players,
+  canAdvance,
+  onAdvance,
   onClose,
 }: {
   summary: NonNullable<PublicGameState["previousRoundSummary"]>;
   players: PublicGameState["players"];
+  canAdvance: boolean;
+  onAdvance: () => void;
   onClose: () => void;
 }) {
-  useEscapeToClose(onClose);
+  useEscapeToClose(() => {
+    if (!canAdvance) {
+      onClose();
+    }
+  });
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(4,10,8,0.72)] px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(4,10,8,0.72)] px-4 py-6 backdrop-blur-sm"
+      onMouseDown={() => {
+        if (!canAdvance) {
+          onClose();
+        }
+      }}
+    >
       <div
         className="w-full max-w-4xl rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,26,32,0.96),rgba(7,15,20,0.98))] p-5 shadow-[0_28px_90px_rgba(0,0,0,0.42)] sm:p-6"
         onMouseDown={(event) => event.stopPropagation()}
@@ -1487,13 +1517,23 @@ function RoundSummaryDialog({
               {summary.handSize} card{summary.handSize === 1 ? "" : "s"} played. Scores have been updated.
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs uppercase tracking-[0.18em] text-white/70 transition hover:bg-white/10"
-          >
-            Close
-          </button>
+          {canAdvance ? (
+            <button
+              type="button"
+              onClick={onAdvance}
+              className="rounded-full bg-brass px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-ink transition hover:bg-[#e0bb77]"
+            >
+              Next round
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs uppercase tracking-[0.18em] text-white/70 transition hover:bg-white/10"
+            >
+              Close
+            </button>
+          )}
         </div>
 
         <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">

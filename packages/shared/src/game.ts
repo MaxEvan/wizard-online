@@ -353,7 +353,37 @@ export function playCard(room: RoomState, playerId: string, cardId: string, rand
   return withGame(room, advanceAfterRound(game, nextHands, nextTaken, completedTricks, random));
 }
 
+export function startNextRound(room: RoomState, playerId: string, random = Math.random): RoomState {
+  const game = requireGame(room);
+
+  if (room.hostPlayerId !== playerId) {
+    throw new Error("Only the host can start the next round.");
+  }
+
+  if (game.phase !== "round-summary") {
+    throw new Error("The game is not waiting to start the next round.");
+  }
+
+  const nextDealerIndex = getNextSeatIndex(game.currentRound.dealerIndex, game.playerOrder.length);
+  const nextRoundNumber = game.roundNumber + 1;
+  const nextRound = createRound(game.playerOrder, nextDealerIndex, nextRoundNumber, random);
+
+  return withGame(room, {
+    ...game,
+    phase: nextRound.trump.needsDealerChoice ? "choose-trump" : "bidding",
+    dealerIndex: nextDealerIndex,
+    roundNumber: nextRoundNumber,
+    previousRoundSummary: null,
+    winnerIds: null,
+    currentRound: nextRound,
+  });
+}
+
 export function getAllowedBids(game: GameState, playerId: string): number[] {
+  if (game.phase !== "bidding") {
+    return [];
+  }
+
   const bidderId = getActiveBidderId(game);
   if (bidderId !== playerId) {
     return [];
@@ -586,21 +616,21 @@ function advanceAfterRound(
     };
   }
 
-  const nextDealerIndex = getNextSeatIndex(game.currentRound.dealerIndex, game.playerOrder.length);
-  const nextRoundNumber = game.roundNumber + 1;
-  const nextRound = createRound(game.playerOrder, nextDealerIndex, nextRoundNumber, random);
-
   return {
     ...game,
-    phase: nextRound.trump.needsDealerChoice ? "choose-trump" : "bidding",
-    dealerIndex: nextDealerIndex,
-    roundNumber: nextRoundNumber,
+    phase: "round-summary",
     scores: nextScores,
     lastResolvedTrick: completedTricks.at(-1) ?? null,
     previousRoundSummary: summary,
     roundHistory,
     winnerIds: null,
-    currentRound: nextRound,
+    currentRound: {
+      ...game.currentRound,
+      hands,
+      taken,
+      completedTricks,
+      currentTrick: [],
+    },
   };
 }
 

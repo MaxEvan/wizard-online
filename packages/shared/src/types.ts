@@ -84,7 +84,7 @@ export type DevTimelineEntry = {
 };
 
 export type GameState = {
-  phase: "choose-trump" | "bidding" | "playing" | "game-over";
+  phase: "choose-trump" | "bidding" | "playing" | "round-summary" | "game-over";
   options: RoomOptions;
   playerOrder: string[];
   dealerIndex: number;

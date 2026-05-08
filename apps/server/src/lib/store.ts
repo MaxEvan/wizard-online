@@ -10,6 +10,7 @@ import {
   toPublicRoomState,
   updateRoomOptions,
   startGame,
+  startNextRound,
   chooseTrump,
   submitBid,
   playCard,
@@ -135,6 +136,10 @@ export class RoomStore {
 
   async playCard(code: string, playerId: string, cardId: string): Promise<RoomState> {
     return this.mutateRoom(code, (room) => playCard(room, playerId, cardId));
+  }
+
+  async startNextRound(code: string, playerId: string): Promise<RoomState> {
+    return this.mutateRoom(code, (room) => startNextRound(room, playerId));
   }
 
   async advanceSimulationStep(code: string): Promise<RoomState | null> {

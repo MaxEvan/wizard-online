@@ -142,6 +142,10 @@ io.on("connection", (socket) => {
     await handleSocketAction(socket, code, async () => roomStore.playCard(code, playerId, cardId));
   });
 
+  socket.on("game:next-round", async ({ code, playerId }: ActionPayload) => {
+    await handleSocketAction(socket, code, async () => roomStore.startNextRound(code, playerId));
+  });
+
   socket.on("disconnect", async () => {
     const code = socket.data.roomCode as string | undefined;
     const playerId = socket.data.playerId as string | undefined;
@@ -307,7 +311,13 @@ function describeTransition(previousRoom: RoomState | null, nextRoom: RoomState)
     }
   }
 
-  if (nextGame.previousRoundSummary && previousGame.roundNumber !== nextGame.roundNumber) {
+  if (nextGame.phase === "round-summary" && previousGame.phase !== "round-summary" && nextGame.previousRoundSummary) {
+    entries.push(createTimelineEntry(previousGame.roundNumber, describeHandEnd(nextRoom, nextGame.previousRoundSummary.scoreDeltas, previousPlayersById)));
+  }
+
+  if (previousGame.phase === "round-summary" && nextGame.roundNumber !== previousGame.roundNumber) {
+    entries.push(createTimelineEntry(nextGame.roundNumber, describeHandStart(nextRoom, nextGame.roundNumber)));
+  } else if (nextGame.previousRoundSummary && previousGame.roundNumber !== nextGame.roundNumber) {
     entries.push(createTimelineEntry(previousGame.roundNumber, describeHandEnd(nextRoom, nextGame.previousRoundSummary.scoreDeltas, previousPlayersById)));
     entries.push(createTimelineEntry(nextGame.roundNumber, describeHandStart(nextRoom, nextGame.roundNumber)));
   } else if (nextGame.previousRoundSummary && nextGame.phase === "game-over" && previousGame.phase !== "game-over") {
