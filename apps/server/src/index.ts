@@ -4,7 +4,6 @@ import { fileURLToPath } from "node:url";
 import { config as loadEnv } from "dotenv";
 
 import Fastify from "fastify";
-import cors from "@fastify/cors";
 import { Server } from "socket.io";
 
 import { toPublicRoomState, type Card, type CardSuit, type DevTimelineEntry, type RoomOptions, type RoomState } from "@wizard/shared";
@@ -16,7 +15,6 @@ const currentDir = dirname(fileURLToPath(import.meta.url));
 loadEnv({ path: resolve(currentDir, "../../../.env") });
 
 const port = Number(process.env.PORT ?? 3001);
-const clientOrigin = process.env.CLIENT_ORIGIN ?? "http://localhost:5173";
 const devSimulationEnabled = process.env.NODE_ENV !== "production";
 const devActionDelayMs = 500;
 
@@ -31,11 +29,6 @@ const pool = await createDatabasePool({
 const roomStore = new RoomStore(pool);
 const app = Fastify({ logger: true });
 const roomActionQueues = new Map<string, Promise<void>>();
-
-await app.register(cors, {
-  origin: clientOrigin,
-  credentials: true,
-});
 
 app.get("/api/health", async () => ({ ok: true }));
 
@@ -76,10 +69,7 @@ app.get<{
 });
 
 const io = new Server(app.server, {
-  cors: {
-    origin: clientOrigin,
-    credentials: true,
-  },
+  path: "/api/socket.io",
 });
 
 const socketPresence = new Map<string, number>();

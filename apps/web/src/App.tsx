@@ -110,7 +110,8 @@ export default function App() {
       return;
     }
 
-    const nextSocket = io(import.meta.env.VITE_API_URL ?? window.location.origin, {
+    const nextSocket = io({
+      path: "/api/socket.io",
       transports: ["websocket"],
     });
 

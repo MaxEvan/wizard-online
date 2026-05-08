@@ -1,7 +1,5 @@
 import type { PublicRoomState, RoomOptions } from "@wizard/shared";
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "";
-
 type RoomAuthResponse = {
   playerId: string;
   room: PublicRoomState;
@@ -31,7 +29,7 @@ export async function loadRoom(code: string, playerId: string): Promise<PublicRo
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${path}`, {
+  const response = await fetch(path, {
     ...init,
     headers: {
       "Content-Type": "application/json",

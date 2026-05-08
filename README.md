@@ -48,6 +48,13 @@ cp .env.example .env
 pnpm dev
 ```
 
+The web app talks to the backend through same-origin paths:
+
+- HTTP API: `/api/...`
+- Socket.IO: `/api/socket.io`
+
+In local development, Vite proxies `/api` to the server on port `3001`. In production, put a reverse proxy in front of web and API and forward `/api/*` to the backend service.
+
 5. Open:
 
 - Web: `http://localhost:5173`
