@@ -42,6 +42,12 @@ This project maps MySQL to host port `3307` by default to avoid conflicts with a
 cp .env.example .env
 ```
 
+The app now uses a single MySQL connection string:
+
+```bash
+DATABASE_URL=mysql://wizard:wizard@127.0.0.1:3307/wizard_online
+```
+
 4. Start the app:
 
 ```bash
