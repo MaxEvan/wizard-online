@@ -74,7 +74,11 @@ export function createDeck(): Card[] {
 }
 
 export function shuffleDeck(deck: Card[], random = Math.random): Card[] {
-  const result = [...deck];
+  return shuffleArray(deck, random);
+}
+
+function shuffleArray<T>(items: T[], random: () => number): T[] {
+  const result = [...items];
 
   for (let index = result.length - 1; index > 0; index -= 1) {
     const swapIndex = Math.floor(random() * (index + 1));
@@ -192,17 +196,18 @@ export function startGame(room: RoomState, random = Math.random): RoomState {
     throw new Error("The room must have the configured number of players before starting.");
   }
 
-  const playerOrder = [...room.players]
-    .sort((left, right) => left.seat - right.seat)
-    .map((player) => player.id);
+  const seatedPlayers = shufflePlayersForGame(room.players, random);
+  const playerOrder = seatedPlayers.map((player) => player.id);
+  const dealerIndex = Math.floor(random() * playerOrder.length);
 
   const scores = Object.fromEntries(playerOrder.map((playerId) => [playerId, 0]));
 
-  const game = createGameState(playerOrder, scores, room.options, random);
+  const game = createGameState(playerOrder, dealerIndex, scores, room.options, random);
 
   return touchRoom({
     ...room,
     status: "in-game",
+    players: seatedPlayers,
     game,
   });
 }
@@ -464,11 +469,11 @@ export function resolveTrick(plays: TrickPlay[], trumpSuit: CardSuit | null): Tr
 
 function createGameState(
   playerOrder: string[],
+  dealerIndex: number,
   scores: Record<string, number>,
   options: RoomOptions,
   random: () => number,
 ): GameState {
-  const dealerIndex = 0;
   const round = createRound(playerOrder, dealerIndex, 1, random);
 
   return {
@@ -486,6 +491,13 @@ function createGameState(
     winnerIds: null,
     devTimeline: [],
   };
+}
+
+function shufflePlayersForGame(players: RoomPlayer[], random: () => number): RoomPlayer[] {
+  return shuffleArray(players, random).map((player, seat) => ({
+    ...player,
+    seat,
+  }));
 }
 
 function createRound(playerOrder: string[], dealerIndex: number, handSize: number, random: () => number): RoundState {
