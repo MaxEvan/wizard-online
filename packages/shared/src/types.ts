@@ -149,3 +149,12 @@ export type PublicRoomState = {
   game: PublicGameState | null;
   selfPlayerId: string;
 };
+
+export type RoomAvailability = {
+  code: string;
+  status: RoomStatus;
+  playerCount: number;
+  joinedCount: number;
+  joinable: boolean;
+  reason: string | null;
+};

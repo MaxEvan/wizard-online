@@ -87,6 +87,16 @@ app.get<{
   }
 });
 
+app.get<{
+  Params: { code: string };
+}>("/api/rooms/:code/availability", async (request, reply) => {
+  try {
+    return await roomStore.getRoomAvailability(request.params.code);
+  } catch (error) {
+    return reply.code(404).send({ error: getErrorMessage(error) });
+  }
+});
+
 const io = new Server(app.server, {
   path: "/api/socket.io",
 });

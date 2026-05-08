@@ -14,7 +14,7 @@ import {
   submitBid,
   playCard,
 } from "@wizard/shared";
-import type { CardSuit, PublicRoomState, RoomOptions, RoomState } from "@wizard/shared";
+import type { CardSuit, PublicRoomState, RoomAvailability, RoomOptions, RoomState } from "@wizard/shared";
 
 import { seedSimulatedBots, stepSimulatedRoom } from "./simulation.js";
 
@@ -49,6 +49,11 @@ export class RoomStore {
     }
 
     const playerId = requestedPlayerId ?? createPlayerId();
+    const existingPlayer = room.players.find((player) => player.id === playerId);
+    if (!existingPlayer && room.status !== "lobby") {
+      throw new Error("Game already started.");
+    }
+
     const nextRoom = addPlayerToRoom(room, playerId, sanitizeName(playerName));
     await this.saveRoom(nextRoom);
 
@@ -65,6 +70,30 @@ export class RoomStore {
     }
 
     return toPublicRoomState(room, playerId);
+  }
+
+  async getRoomAvailability(code: string): Promise<RoomAvailability> {
+    const room = await this.getRoom(code);
+    if (!room) {
+      throw new Error("Room not found.");
+    }
+
+    const joinedCount = room.players.length;
+    let reason: string | null = null;
+    if (room.status !== "lobby") {
+      reason = "Game already started.";
+    } else if (joinedCount >= room.options.playerCount) {
+      reason = "Room is full.";
+    }
+
+    return {
+      code: room.code,
+      status: room.status,
+      playerCount: room.options.playerCount,
+      joinedCount,
+      joinable: reason === null,
+      reason,
+    };
   }
 
   async setConnected(code: string, playerId: string, connected: boolean): Promise<RoomState | null> {

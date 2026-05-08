@@ -3,9 +3,9 @@ import { createPortal } from "react-dom";
 import { io, type Socket } from "socket.io-client";
 
 import { createDeck, resolveTrick } from "@wizard/shared";
-import type { Card, CardSuit, PublicGameState, PublicRoomState, RoomOptions } from "@wizard/shared";
+import type { Card, CardSuit, PublicGameState, PublicRoomState, RoomAvailability, RoomOptions } from "@wizard/shared";
 
-import { createRoom, joinRoom, loadRoom } from "./lib/api";
+import { createRoom, joinRoom, loadRoom, loadRoomAvailability } from "./lib/api";
 import { getStoredName, getStoredPlayerId, storeName, storePlayerId } from "./lib/storage";
 
 const DEFAULT_OPTIONS: RoomOptions = {
@@ -36,14 +36,16 @@ const FULL_DECK = createDeck();
 
 export default function App() {
   const showDevSimulation = import.meta.env.DEV;
+  const routedJoinCode = currentJoinCode();
   const [name, setName] = useState(getStoredName);
   const [renameDraft, setRenameDraft] = useState("");
-  const [joinCode, setJoinCode] = useState(currentRoomCode() ?? "");
+  const [joinCode, setJoinCode] = useState(routedJoinCode ?? "");
   const [playerId, setPlayerId] = useState<string | null>(() => {
     const code = currentRoomCode();
     return code ? getStoredPlayerId(code) : null;
   });
   const [room, setRoom] = useState<PublicRoomState | null>(null);
+  const [roomAvailability, setRoomAvailability] = useState<RoomAvailability | null>(null);
   const [draftOptions, setDraftOptions] = useState<RoomOptions>(DEFAULT_OPTIONS);
   const [simulateBots, setSimulateBots] = useState(showDevSimulation);
   const [error, setError] = useState<string | null>(null);
@@ -59,6 +61,10 @@ export default function App() {
   const canStart = !!room && room.players.length === room.options.playerCount && room.status === "lobby";
   const activePlayer = game?.players.find((player) => player.id === game.activePlayerId) ?? null;
   const canRenameSelf = room?.status === "lobby" && !!playerId;
+  const normalizedJoinCode = joinCode.trim().toUpperCase();
+  const joinBlockedReason = roomAvailability && roomAvailability.code === normalizedJoinCode ? roomAvailability.reason : null;
+  const canSubmitJoin = normalizedJoinCode.length === 6 && !busy && joinBlockedReason === null;
+  const showJoinOnlyLanding = !!routedJoinCode;
 
   useEffect(() => {
     if (!room) {
@@ -77,8 +83,8 @@ export default function App() {
       return;
     }
 
-    setShowTableMenu(room.status === "lobby");
-  }, [room?.status]);
+    setShowTableMenu(room.status === "lobby" && room.hostPlayerId === playerId);
+  }, [playerId, room]);
 
   useEffect(() => {
     if (!systemToastMessage) {
@@ -115,6 +121,34 @@ export default function App() {
         setError("Unable to restore the room session.");
       });
   }, []);
+
+  useEffect(() => {
+    if (room || normalizedJoinCode.length !== 6) {
+      setRoomAvailability(null);
+      return;
+    }
+
+    let canceled = false;
+    loadRoomAvailability(normalizedJoinCode)
+      .then((availability) => {
+        if (!canceled) {
+          setRoomAvailability(availability);
+          setError(null);
+        }
+      })
+      .catch((nextError) => {
+        if (!canceled) {
+          setRoomAvailability(null);
+          if (routedJoinCode === normalizedJoinCode) {
+            setError(getErrorMessage(nextError));
+          }
+        }
+      });
+
+    return () => {
+      canceled = true;
+    };
+  }, [normalizedJoinCode, room, routedJoinCode]);
 
   useEffect(() => {
     if (!room || !playerId) {
@@ -167,6 +201,10 @@ export default function App() {
 
   async function handleJoinRoom(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!canSubmitJoin) {
+      return;
+    }
+
     setBusy(true);
     setError(null);
 
@@ -220,6 +258,32 @@ export default function App() {
     setSystemToastMessage("Saved successfully");
   }
 
+  async function handleCopyInviteLink() {
+    if (!room) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(joinRoomUrl(room.code));
+      setSystemToastMessage("Invite link copied");
+    } catch {
+      setError("Unable to copy the invite link.");
+    }
+  }
+
+  async function handleCopyRoomCode() {
+    if (!room) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(room.code);
+      setSystemToastMessage("Room code copied");
+    } catch {
+      setError("Unable to copy the room code.");
+    }
+  }
+
   return (
     <main className="min-h-screen px-4 py-6 text-parchment md:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -228,7 +292,7 @@ export default function App() {
             <p className="font-body text-sm uppercase tracking-[0.24em] text-brass">Wizard Online</p>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            {room ? (
+            {game && game.roundHistory.length > 0 ? (
               <button
                 type="button"
                 onClick={() => setShowRoundHistory(true)}
@@ -243,12 +307,14 @@ export default function App() {
                 onClick={() => setShowFullDeck(true)}
                 className="rounded-full border border-brass/40 bg-brass/10 px-4 py-3 text-sm font-semibold text-brass transition hover:bg-brass/20"
               >
-                See full deck
+                Deck Reference
               </button>
             ) : null}
-            <div className="rounded-full border border-brass/30 bg-brass/10 px-4 py-3 text-sm text-brass">
-              {room ? `Room ${room.code}` : "Create a room or join an existing code"}
-            </div>
+            {!room ? (
+              <div className="rounded-full border border-brass/30 bg-brass/10 px-4 py-3 text-sm text-brass">
+                {showJoinOnlyLanding ? `Joining room ${routedJoinCode}` : "Create a room or join an existing code"}
+              </div>
+            ) : null}
             {room ? (
               <button
                 type="button"
@@ -264,119 +330,126 @@ export default function App() {
         {error ? <div className="rounded-2xl border border-red-300/30 bg-red-500/10 px-4 py-3 text-sm text-red-100">{error}</div> : null}
 
         {!room ? (
-          <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-            <form onSubmit={handleCreateRoom} className="rounded-[28px] border border-white/10 bg-black/20 p-6 shadow-table backdrop-blur">
-              <h2 className="font-display text-2xl">Create a table</h2>
-              <div className="mt-5 grid gap-4 md:grid-cols-2">
-                <label className="flex flex-col gap-2 md:col-span-2">
-                  <span className="text-sm text-brass">Display name</span>
-                  <input
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-parchment outline-none transition focus:border-brass/60"
-                    placeholder="Table Mage"
-                    minLength={2}
-                    maxLength={24}
-                    required
-                  />
-                </label>
-                <OptionField label="Players">
-                  <select
-                    value={draftOptions.playerCount}
-                    onChange={(event) =>
-                      setDraftOptions((current) => ({ ...current, playerCount: Number(event.target.value) }))
-                    }
-                    className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-parchment outline-none"
-                  >
-                    {(showDevSimulation && simulateBots ? SIMULATED_PLAYER_COUNT_OPTIONS : PLAYER_COUNT_OPTIONS).map((count) => (
-                      <option key={count} value={count} className="bg-ink">
-                        {count}
-                      </option>
-                    ))}
-                  </select>
-                </OptionField>
-                {showDevSimulation ? (
-                  <OptionField label="Dev simulation">
+          <section className={showJoinOnlyLanding ? "mx-auto w-full max-w-2xl" : "grid gap-6 lg:grid-cols-[1.1fr_0.9fr]"}>
+            {showJoinOnlyLanding ? null : (
+              <form onSubmit={handleCreateRoom} className="rounded-[28px] border border-white/10 bg-black/20 p-6 shadow-table backdrop-blur">
+                <h2 className="font-display text-2xl">Create a table</h2>
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  <label className="flex flex-col gap-2 md:col-span-2">
+                    <span className="text-sm text-brass">Display name</span>
+                    <input
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-parchment outline-none transition focus:border-brass/60"
+                      placeholder="Table Mage"
+                      minLength={2}
+                      maxLength={24}
+                      required
+                    />
+                  </label>
+                  <OptionField label="Players">
+                    <select
+                      value={draftOptions.playerCount}
+                      onChange={(event) =>
+                        setDraftOptions((current) => ({ ...current, playerCount: Number(event.target.value) }))
+                      }
+                      className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-parchment outline-none"
+                    >
+                      {(showDevSimulation && simulateBots ? SIMULATED_PLAYER_COUNT_OPTIONS : PLAYER_COUNT_OPTIONS).map((count) => (
+                        <option key={count} value={count} className="bg-ink">
+                          {count}
+                        </option>
+                      ))}
+                    </select>
+                  </OptionField>
+                  {showDevSimulation ? (
+                    <OptionField label="Dev simulation">
+                      <label className="flex h-full items-center justify-between rounded-2xl border border-white/15 bg-white/5 px-4 py-3">
+                        <span>{simulateBots ? `1 human + ${draftOptions.playerCount - 1} CPU players` : "Manual seats only"}</span>
+                        <input
+                          type="checkbox"
+                          checked={simulateBots}
+                          onChange={(event) => {
+                            const checked = event.target.checked;
+                            setSimulateBots(checked);
+                            if (checked) {
+                              setDraftOptions((current) => ({
+                                ...current,
+                                playerCount: Math.max(current.playerCount, 4),
+                              }));
+                            }
+                          }}
+                        />
+                      </label>
+                    </OptionField>
+                  ) : null}
+                  <OptionField label="Hidden bids">
                     <label className="flex h-full items-center justify-between rounded-2xl border border-white/15 bg-white/5 px-4 py-3">
-                      <span>{simulateBots ? `1 human + ${draftOptions.playerCount - 1} CPU players` : "Manual seats only"}</span>
+                      <span>{draftOptions.hiddenBids ? "Enabled" : "Open bidding"}</span>
                       <input
                         type="checkbox"
-                        checked={simulateBots}
-                        onChange={(event) => {
-                          const checked = event.target.checked;
-                          setSimulateBots(checked);
-                          if (checked) {
-                            setDraftOptions((current) => ({
-                              ...current,
-                              playerCount: Math.max(current.playerCount, 4),
-                            }));
-                          }
-                        }}
+                        checked={draftOptions.hiddenBids}
+                        onChange={(event) =>
+                          setDraftOptions((current) => ({ ...current, hiddenBids: event.target.checked }))
+                        }
                       />
                     </label>
                   </OptionField>
-                ) : null}
-                <OptionField label="Hidden bids">
-                  <label className="flex h-full items-center justify-between rounded-2xl border border-white/15 bg-white/5 px-4 py-3">
-                    <span>{draftOptions.hiddenBids ? "Enabled" : "Open bidding"}</span>
-                    <input
-                      type="checkbox"
-                      checked={draftOptions.hiddenBids}
+                  <OptionField label="Dealer bid rule">
+                    <select
+                      value={draftOptions.dealerBidRule}
                       onChange={(event) =>
-                        setDraftOptions((current) => ({ ...current, hiddenBids: event.target.checked }))
+                        setDraftOptions((current) => ({
+                          ...current,
+                          dealerBidRule: event.target.value as RoomOptions["dealerBidRule"],
+                        }))
                       }
-                    />
-                  </label>
-                </OptionField>
-                <OptionField label="Dealer bid rule">
-                  <select
-                    value={draftOptions.dealerBidRule}
-                    onChange={(event) =>
-                      setDraftOptions((current) => ({
-                        ...current,
-                        dealerBidRule: event.target.value as RoomOptions["dealerBidRule"],
-                      }))
-                    }
-                    className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-parchment outline-none"
-                  >
-                    <option value="none" className="bg-ink">
-                      Standard
-                    </option>
-                    <option value="no-equal-total" className="bg-ink">
-                      Last bidder cannot go even
-                    </option>
-                    <option value="canadian" className="bg-ink">
-                      Canadian rule
-                    </option>
-                  </select>
-                </OptionField>
-                <NumberOption
-                  label="Exact bid bonus"
-                  value={draftOptions.scoreBonus}
-                  onChange={(value) => setDraftOptions((current) => ({ ...current, scoreBonus: value }))}
-                />
-                <NumberOption
-                  label="Points per trick"
-                  value={draftOptions.exactTrickPoints}
-                  onChange={(value) => setDraftOptions((current) => ({ ...current, exactTrickPoints: value }))}
-                />
-                <NumberOption
-                  label="Miss penalty"
-                  value={draftOptions.missPenalty}
-                  onChange={(value) => setDraftOptions((current) => ({ ...current, missPenalty: value }))}
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={busy}
-                className="mt-6 rounded-2xl bg-brass px-5 py-3 font-semibold text-ink transition hover:bg-[#e0bb77] disabled:opacity-60"
-              >
-                Create room
-              </button>
-            </form>
+                      className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-parchment outline-none"
+                    >
+                      <option value="none" className="bg-ink">
+                        Standard
+                      </option>
+                      <option value="no-equal-total" className="bg-ink">
+                        Last bidder cannot go even
+                      </option>
+                      <option value="canadian" className="bg-ink">
+                        Canadian rule
+                      </option>
+                    </select>
+                  </OptionField>
+                  <NumberOption
+                    label="Exact bid bonus"
+                    value={draftOptions.scoreBonus}
+                    onChange={(value) => setDraftOptions((current) => ({ ...current, scoreBonus: value }))}
+                  />
+                  <NumberOption
+                    label="Points per trick"
+                    value={draftOptions.exactTrickPoints}
+                    onChange={(value) => setDraftOptions((current) => ({ ...current, exactTrickPoints: value }))}
+                  />
+                  <NumberOption
+                    label="Miss penalty"
+                    value={draftOptions.missPenalty}
+                    onChange={(value) => setDraftOptions((current) => ({ ...current, missPenalty: value }))}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={busy}
+                  className="mt-6 rounded-2xl bg-brass px-5 py-3 font-semibold text-ink transition hover:bg-[#e0bb77] disabled:opacity-60"
+                >
+                  Create room
+                </button>
+              </form>
+            )}
 
             <form onSubmit={handleJoinRoom} className="rounded-[28px] border border-white/10 bg-black/20 p-6 shadow-table backdrop-blur">
               <h2 className="font-display text-2xl">Join by code</h2>
+              {routedJoinCode ? (
+                <p className="mt-3 text-sm text-white/70">
+                  This invite link opens room <span className="font-semibold tracking-[0.2em] text-brass">{routedJoinCode}</span>.
+                </p>
+              ) : null}
               <div className="mt-5 grid gap-4">
                 <label className="flex flex-col gap-2">
                   <span className="text-sm text-brass">Display name</span>
@@ -384,7 +457,7 @@ export default function App() {
                     value={name}
                     onChange={(event) => setName(event.target.value)}
                     className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-parchment outline-none"
-                    placeholder="Card Oracle"
+                    placeholder="Enter your name"
                     minLength={2}
                     maxLength={24}
                     required
@@ -403,9 +476,16 @@ export default function App() {
                   />
                 </label>
               </div>
+              {roomAvailability && roomAvailability.code === normalizedJoinCode ? (
+                <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white/75">
+                  {roomAvailability.joinable
+                    ? `Open seats: ${roomAvailability.playerCount - roomAvailability.joinedCount}.`
+                    : roomAvailability.reason}
+                </div>
+              ) : null}
               <button
                 type="submit"
-                disabled={busy}
+                disabled={!canSubmitJoin}
                 className="mt-6 rounded-2xl border border-brass/60 px-5 py-3 font-semibold text-brass transition hover:bg-brass/10 disabled:opacity-60"
               >
                 Join room
@@ -450,6 +530,17 @@ export default function App() {
                             ? "Use the start button when the roster looks right."
                             : "Only the host can start. You can still rename yourself in the table menu."}
                         </div>
+                        {isHost ? (
+                          <div className="mt-6 grid gap-3">
+                            <button
+                              type="button"
+                              onClick={() => void handleCopyInviteLink()}
+                              className="w-full rounded-2xl border border-brass/40 bg-brass/10 px-5 py-3 text-sm font-semibold text-brass transition hover:bg-brass/20"
+                            >
+                              Copy invite link
+                            </button>
+                          </div>
+                        ) : null}
                         <button
                           disabled={!isHost || !canStart}
                           onClick={() => emit("game:start", {})}
@@ -1714,6 +1805,15 @@ function signed(value: number): string {
 function currentRoomCode(): string | null {
   const match = window.location.pathname.match(/\/room\/([A-Z0-9]{6})/i);
   return match?.[1]?.toUpperCase() ?? null;
+}
+
+function currentJoinCode(): string | null {
+  const match = window.location.pathname.match(/\/join\/([A-Z0-9]{6})/i);
+  return match?.[1]?.toUpperCase() ?? null;
+}
+
+function joinRoomUrl(code: string): string {
+  return `${window.location.origin}/join/${code.toUpperCase()}`;
 }
 
 function getErrorMessage(error: unknown): string {

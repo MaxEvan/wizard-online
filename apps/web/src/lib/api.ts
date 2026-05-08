@@ -1,4 +1,4 @@
-import type { PublicRoomState, RoomOptions } from "@wizard/shared";
+import type { PublicRoomState, RoomAvailability, RoomOptions } from "@wizard/shared";
 
 type RoomAuthResponse = {
   playerId: string;
@@ -26,6 +26,10 @@ export async function joinRoom(code: string, name: string, playerId?: string): P
 export async function loadRoom(code: string, playerId: string): Promise<PublicRoomState> {
   const query = new URLSearchParams({ playerId });
   return request(`/api/rooms/${code}?${query.toString()}`);
+}
+
+export async function loadRoomAvailability(code: string): Promise<RoomAvailability> {
+  return request(`/api/rooms/${code}/availability`);
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
