@@ -631,6 +631,13 @@ function GameBoard({
   const turnToastMessage = getTurnToastMessage(game, selfPlayerId, dealer?.id ?? null, self?.isBot ?? false);
   const visibleBidCount = game.players.filter((player) => player.bid !== null).length;
   const visibleBidTotal = game.players.reduce((sum, player) => sum + (player.bid ?? 0), 0);
+  const totalTurnsInHand = game.handSize * game.players.length;
+  const currentTurnInHand =
+    game.phase === "playing"
+      ? Math.min(totalTurnsInHand, game.completedTrickCount * game.players.length + game.currentTrick.length + 1)
+      : game.phase === "round-summary" || game.phase === "game-over"
+        ? totalTurnsInHand
+        : 0;
   const orderedPlayers = self ? getPlayersRelativeToSelf(game, self.id) : game.players;
   const seatPositions = getTableSeatPositions(orderedPlayers.length);
   const winningCard = getCurrentWinningCard(game);
@@ -804,6 +811,14 @@ function GameBoard({
     <Panel title={`Hand ${game.roundNumber} of ${game.maxRounds}`}>
       <div className="grid gap-5">
         <div className="grid gap-5">
+          <div className="flex items-center justify-center">
+            <div className="rounded-full border border-brass/30 bg-black/20 px-5 py-2 text-center shadow-[0_12px_28px_rgba(0,0,0,0.2)] backdrop-blur">
+              <div className="text-[10px] uppercase tracking-[0.2em] text-brass">Turn In Hand</div>
+              <div className="mt-1 text-sm font-semibold text-parchment">
+                {currentTurnInHand} of {totalTurnsInHand}
+              </div>
+            </div>
+          </div>
           <div className="rounded-[32px] border border-[#e3c98d]/18 bg-[radial-gradient(circle_at_50%_45%,rgba(255,255,255,0.08),transparent_40%),radial-gradient(circle_at_50%_50%,rgba(8,33,24,0.2),transparent_58%),linear-gradient(180deg,rgba(18,78,60,0.96),rgba(6,38,29,0.98))] p-3 shadow-[inset_0_2px_0_rgba(255,255,255,0.08),inset_0_-24px_80px_rgba(0,0,0,0.28),0_30px_80px_rgba(2,12,10,0.42)] sm:p-5">
             <div className="rounded-[28px] border border-[#f1d7a1]/12 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.06),transparent_42%),linear-gradient(180deg,rgba(14,66,50,0.58),rgba(6,27,20,0.8))] px-3 py-4 sm:px-5 sm:py-6">
               <div className="relative min-h-[720px] overflow-hidden rounded-[24px] border border-black/15 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.08),transparent_28%),radial-gradient(circle_at_50%_48%,rgba(2,20,15,0.4),transparent_62%),repeating-radial-gradient(circle_at_center,rgba(255,255,255,0.025)_0,rgba(255,255,255,0.025)_2px,transparent_2px,transparent_10px)] px-2 py-3 sm:min-h-[780px]">
