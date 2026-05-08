@@ -21,6 +21,7 @@ const devSimulationEnabled = process.env.NODE_ENV !== "production";
 const devActionDelayMs = 500;
 const databaseUrl = process.env.DATABASE_URL;
 const webDistDir = resolve(currentDir, "../../web/dist");
+const webAssetsDir = resolve(webDistDir, "assets");
 
 if (!databaseUrl) {
   throw new Error("DATABASE_URL is required.");
@@ -37,7 +38,13 @@ app.get("/api/health", async () => ({ ok: true }));
 if (existsSync(webDistDir)) {
   await app.register(fastifyStatic, {
     root: webDistDir,
+    serve: false,
+  });
+
+  await app.register(fastifyStatic, {
+    root: webAssetsDir,
     prefix: "/assets/",
+    decorateReply: false,
   });
 
   app.get("/", async (_request, reply) => reply.sendFile("index.html"));
