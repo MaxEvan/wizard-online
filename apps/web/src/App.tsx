@@ -1177,7 +1177,7 @@ function ActionDialog({
     description = "Choose the number of tricks you expect to take this hand, then review your cards below.";
   } else if (mode === "trump") {
     title = "Choose trump";
-    description = "Pick the trump suit for this hand.";
+    description = "Pick the trump suit for this hand, then review your cards below if needed.";
   } else if (game.phase === "playing" && isActive) {
     description = "Playable cards are highlighted. Choose one card to play.";
   }
@@ -1253,7 +1253,7 @@ function ActionDialog({
           </div>
         ) : null}
 
-        {mode === "hand" || mode === "bid" ? (
+        {mode === "hand" || mode === "bid" || mode === "trump" ? (
           <HandCardFan
             cards={game.yourHand}
             winningCard={winningCard}
