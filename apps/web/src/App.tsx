@@ -629,6 +629,8 @@ function GameBoard({
   const isTrumpChooser = game.phase === "choose-trump" && dealer?.id === selfPlayerId;
   const isActive = game.activePlayerId === selfPlayerId;
   const turnToastMessage = getTurnToastMessage(game, selfPlayerId, dealer?.id ?? null, self?.isBot ?? false);
+  const visibleBidCount = game.players.filter((player) => player.bid !== null).length;
+  const visibleBidTotal = game.players.reduce((sum, player) => sum + (player.bid ?? 0), 0);
   const orderedPlayers = self ? getPlayersRelativeToSelf(game, self.id) : game.players;
   const seatPositions = getTableSeatPositions(orderedPlayers.length);
   const winningCard = getCurrentWinningCard(game);
@@ -639,6 +641,10 @@ function GameBoard({
   const [roundSummaryDialog, setRoundSummaryDialog] = useState<PublicGameState["previousRoundSummary"] | null>(null);
   const [pendingSelfPlayCard, setPendingSelfPlayCard] = useState<Card | null>(null);
   const displayedGameRef = useRef(game);
+  const previousTurnRef = useRef<{ phase: PublicGameState["phase"]; activePlayerId: string }>({
+    phase: game.phase,
+    activePlayerId: game.activePlayerId,
+  });
   const animationInFlightRef = useRef(false);
   const queuedGameRef = useRef<PublicGameState | null>(null);
   const entryAnimationTimeoutRef = useRef<number | null>(null);
@@ -665,6 +671,21 @@ function GameBoard({
   useEffect(() => {
     displayedGameRef.current = game;
   }, [game]);
+
+  useEffect(() => {
+    const previousTurn = previousTurnRef.current;
+    const isSelfTurnToPlay = game.phase === "playing" && game.activePlayerId === selfPlayerId;
+    const wasSelfTurnToPlay = previousTurn.phase === "playing" && previousTurn.activePlayerId === selfPlayerId;
+
+    if (isSelfTurnToPlay && !wasSelfTurnToPlay) {
+      setActiveDialog("hand");
+    }
+
+    previousTurnRef.current = {
+      phase: game.phase,
+      activePlayerId: game.activePlayerId,
+    };
+  }, [game.activePlayerId, game.phase, selfPlayerId]);
 
   useEffect(() => {
     if (animationInFlightRef.current) {
@@ -923,6 +944,13 @@ function GameBoard({
                       <div className="mt-1 text-[10px] uppercase tracking-[0.18em] text-white/70">
                         {game.trumpSuit ? SUIT_LABELS[game.trumpSuit] : "None"}
                       </div>
+                    </div>
+                  </div>
+                  <div className="absolute left-1 top-1 z-20 rounded-[18px] border border-white/10 bg-black/40 px-3 py-2 shadow-[0_12px_28px_rgba(0,0,0,0.24)] backdrop-blur sm:left-2 sm:top-2">
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-brass">Total bids</div>
+                    <div className="mt-1 text-lg font-semibold text-parchment">{visibleBidTotal}</div>
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-white/70">
+                      {visibleBidCount} of {game.players.length} shown
                     </div>
                   </div>
                   {trickCollectAnimation ? (
