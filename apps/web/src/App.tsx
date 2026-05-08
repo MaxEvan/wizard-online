@@ -52,6 +52,7 @@ export default function App() {
   const [showTableMenu, setShowTableMenu] = useState(false);
   const [showFullDeck, setShowFullDeck] = useState(false);
   const [showRoundHistory, setShowRoundHistory] = useState(false);
+  const [systemToastMessage, setSystemToastMessage] = useState<string | null>(null);
   const self = room?.players.find((player) => player.id === playerId) ?? null;
   const game = room?.game ?? null;
   const isHost = room?.hostPlayerId === playerId;
@@ -78,6 +79,18 @@ export default function App() {
 
     setShowTableMenu(room.status === "lobby");
   }, [room?.status]);
+
+  useEffect(() => {
+    if (!systemToastMessage) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setSystemToastMessage(null);
+    }, 2200);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [systemToastMessage]);
 
   useEffect(() => {
     const code = currentRoomCode();
@@ -201,6 +214,12 @@ export default function App() {
     emit("room:rename-player", { name: nextName });
   }
 
+  function handleSaveOptions() {
+    emit("room:update-options", { options: draftOptions });
+    setShowTableMenu(false);
+    setSystemToastMessage("Saved successfully");
+  }
+
   return (
     <main className="min-h-screen px-4 py-6 text-parchment md:px-8">
       <div className="mx-auto flex max-w-7xl flex-col gap-6">
@@ -236,7 +255,7 @@ export default function App() {
                 onClick={() => setShowTableMenu((current) => !current)}
                 className="rounded-full border border-brass/40 bg-brass/10 px-4 py-3 text-sm font-semibold text-brass transition hover:bg-brass/20"
               >
-                {showTableMenu ? "Hide table menu" : "Show table menu"}
+                {showTableMenu ? "Hide table options" : "Show table options"}
               </button>
             ) : null}
           </div>
@@ -470,7 +489,7 @@ export default function App() {
             handleRenameSelf={handleRenameSelf}
             draftOptions={draftOptions}
             setDraftOptions={setDraftOptions}
-            onSaveOptions={() => emit("room:update-options", { options: draftOptions })}
+            onSaveOptions={handleSaveOptions}
             onClose={() => setShowTableMenu(false)}
           />
         ) : null}
@@ -484,6 +503,7 @@ export default function App() {
             onClose={() => setShowRoundHistory(false)}
           />
         ) : null}
+        {systemToastMessage ? <SystemToast message={systemToastMessage} /> : null}
 
       </div>
     </main>
@@ -1018,16 +1038,7 @@ function ActionDialog({
   let title = self ? `${self.name}'s hand` : "Your hand";
   let description = "Review your cards.";
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  useEscapeToClose(onClose);
 
   if (mode === "bid") {
     title = "Take bid";
@@ -1126,7 +1137,7 @@ function ActionDialog({
   );
 }
 
-function TurnToast({ message }: { message: string }) {
+function ActionToast({ message }: { message: string }) {
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex translate-y-[15%] justify-center px-4">
       <div className="turn-toast rounded-full border border-brass/35 bg-[linear-gradient(180deg,rgba(18,26,32,0.92),rgba(8,15,20,0.96))] px-7 py-4 text-center text-[1.3125rem] font-semibold text-parchment shadow-[0_18px_42px_rgba(0,0,0,0.32)] backdrop-blur">
@@ -1134,6 +1145,33 @@ function TurnToast({ message }: { message: string }) {
       </div>
     </div>
   );
+}
+
+function SystemToast({ message }: { message: string }) {
+  return (
+    <div className="pointer-events-none fixed right-4 top-4 z-50 flex max-w-sm justify-end sm:right-6 sm:top-6">
+      <div className="flex min-w-[260px] items-start gap-3 rounded-2xl border border-white/10 bg-[rgba(20,28,34,0.96)] px-4 py-3 text-sm text-parchment shadow-[0_14px_32px_rgba(0,0,0,0.28)] backdrop-blur">
+        <div className="mt-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_0_4px_rgba(74,222,128,0.12)]" />
+        <div className="min-w-0">
+          <div className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-white/45">Notification</div>
+          <div className="mt-1 font-medium text-white/92">{message}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function useEscapeToClose(onClose: () => void) {
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 }
 
 function TableMenuDialog({
@@ -1161,26 +1199,21 @@ function TableMenuDialog({
   onSaveOptions: () => void;
   onClose: () => void;
 }) {
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  useEscapeToClose(onClose);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(4,10,8,0.72)] px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto bg-[rgba(4,10,8,0.72)] px-4 py-6 backdrop-blur-sm"
+      onMouseDown={onClose}
+    >
+      <div className="flex min-h-full items-start justify-center sm:items-center">
       <div
-        className="w-full max-w-2xl rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,26,32,0.96),rgba(7,15,20,0.98))] p-5 shadow-[0_28px_90px_rgba(0,0,0,0.42)] sm:p-6"
+        className="flex max-h-[calc(100vh-3rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,26,32,0.96),rgba(7,15,20,0.98))] p-5 shadow-[0_28px_90px_rgba(0,0,0,0.42)] sm:p-6"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-xs uppercase tracking-[0.22em] text-brass">Table Menu</div>
+            <div className="text-xs uppercase tracking-[0.22em] text-brass">Table Options</div>
             <div className="mt-2 text-sm text-white/72">Room details, players, and lobby rules.</div>
           </div>
           <button
@@ -1192,7 +1225,8 @@ function TableMenuDialog({
           </button>
         </div>
 
-        <div className="mt-5 grid gap-5 text-sm">
+        <div className="mt-5 min-h-0 overflow-y-auto pr-1 text-sm">
+          <div className="grid gap-5">
           <MenuSection title="Table">
             <div className="grid gap-3">
               <MenuStat label="Room code" value={room.code} emphasize />
@@ -1284,13 +1318,13 @@ function TableMenuDialog({
                   className="rounded-2xl border border-white/15 bg-white/5 px-4 py-3 text-parchment outline-none disabled:opacity-60"
                 >
                   <option value="none" className="bg-ink">
-                    Standard
+                    Standard (dealer may match total bids)
                   </option>
                   <option value="no-equal-total" className="bg-ink">
-                    No even total
+                    No even total (dealer cannot make bids add up)
                   </option>
                   <option value="canadian" className="bg-ink">
-                    Canadian
+                    Canadian (dealer chooses after others, cannot match total)
                   </option>
                 </select>
               </OptionField>
@@ -1323,6 +1357,8 @@ function TableMenuDialog({
             </div>
           </MenuSection>
         </div>
+        </div>
+      </div>
       </div>
     </div>,
     document.body,
@@ -1338,16 +1374,7 @@ function RoundSummaryDialog({
   players: PublicGameState["players"];
   onClose: () => void;
 }) {
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  useEscapeToClose(onClose);
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(4,10,8,0.72)] px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
