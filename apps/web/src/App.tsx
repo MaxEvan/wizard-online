@@ -914,7 +914,7 @@ function GameBoard({
           onClose={() => setRoundSummaryDialog(null)}
         />
       ) : null}
-      {turnToastMessage ? <TurnToast message={turnToastMessage} /> : null}
+      {turnToastMessage ? <ActionToast message={turnToastMessage} /> : null}
     </Panel>
   );
 }
@@ -1421,16 +1421,7 @@ function RoundSummaryDialog({
 }
 
 function FullDeckDialog({ onClose }: { onClose: () => void }) {
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  useEscapeToClose(onClose);
 
   const deckSections: Array<{ title: string; cards: Card[] }> = [
     {
@@ -1509,16 +1500,7 @@ function RoundHistoryDialog({
   players: PublicGameState["players"];
   onClose: () => void;
 }) {
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  useEscapeToClose(onClose);
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(4,10,8,0.72)] px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
