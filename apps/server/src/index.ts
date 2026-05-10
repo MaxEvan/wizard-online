@@ -58,6 +58,7 @@ if (existsSync(webDistDir)) {
 
   app.get("/", sendIndexHtml);
   app.get("/room/:code", sendIndexHtml);
+  app.get("/join/:code", sendIndexHtml);
 }
 
 app.post<{
