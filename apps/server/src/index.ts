@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { config as loadEnv } from "dotenv";
 
 import fastifyStatic from "@fastify/static";
-import Fastify from "fastify";
+import Fastify, { type FastifyReply, type FastifyRequest } from "fastify";
 import { Server } from "socket.io";
 
 import { toPublicRoomState, type Card, type CardSuit, type DevTimelineEntry, type RoomOptions, type RoomState } from "@wizard/shared";
@@ -45,10 +45,19 @@ if (existsSync(webDistDir)) {
     root: webAssetsDir,
     prefix: "/assets/",
     decorateReply: false,
+    setHeaders: (res) => {
+      // Vite asset filenames are content-hashed, so they can be cached aggressively.
+      res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    },
   });
 
-  app.get("/", async (_request, reply) => reply.sendFile("index.html"));
-  app.get("/room/:code", async (_request, reply) => reply.sendFile("index.html"));
+  const sendIndexHtml = async (_request: FastifyRequest, reply: FastifyReply) => {
+    reply.header("Cache-Control", "no-store, no-cache, must-revalidate");
+    return reply.sendFile("index.html");
+  };
+
+  app.get("/", sendIndexHtml);
+  app.get("/room/:code", sendIndexHtml);
 }
 
 app.post<{
